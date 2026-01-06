@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.vs
+.vscode
+.idea
+*.user
+*.suo
+
+# Build outputs
+**/bin
+**/obj
+**/out
+
+# Test results
+**/TestResults
+
+# Documentation
+*.md
+!README.md
+plan/
+
+# Docker
+Dockerfile*
+docker-compose*
+.docker
+
+# Sample codebase (mounted as volume instead)
+sample-codebase
+
+# Environment files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db

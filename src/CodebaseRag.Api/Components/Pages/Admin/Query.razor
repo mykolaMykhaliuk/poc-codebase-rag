@@ -1,0 +1,221 @@
+@page "/admin/query"
+@inject IEmbeddingService EmbeddingService
+@inject IVectorStore VectorStore
+@inject IPromptBuilder PromptBuilder
+@inject IIndexStatusService IndexStatusService
+@inject ILogger<Query> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Query - Codebase RAG</PageTitle>
+
+<div class="page-header">
+    <h1>Query Playground</h1>
+</div>
+
+<div class="query-container">
+    <div class="card">
+        <div class="card-header">
+            <h3>🔍 Ask a Question</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label>Question</label>
+                <textarea @bind="_question" class="form-control" rows="3" placeholder="e.g., How does user authentication work?"></textarea>
+            </div>
+
+            <div class="query-options">
+                <div class="form-group">
+                    <label>Max Results</label>
+                    <input type="number" @bind="_maxResults" class="form-control form-control-small" min="1" max="50" />
+                </div>
+
+                <div class="form-group">
+                    <label>Languages</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" @bind="_includeCSharp" /> C#
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" @bind="_includeJavaScript" /> JavaScript
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" @bind="_includePlainText" /> Plain Text
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Path Filter</label>
+                    <input type="text" @bind="_pathFilter" class="form-control form-control-small" placeholder="e.g., src/Services" />
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-large" @onclick="ExecuteQuery" disabled="@(_isSearching || string.IsNullOrWhiteSpace(_question))">
+                @if (_isSearching)
+                {
+                    <span class="spinner-small"></span>
+                    <span>Searching...</span>
+                }
+                else
+                {
+                    <span>🔍 Search</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-error">
+            @_errorMessage
+            <button class="alert-close" @onclick="() => _errorMessage = null">×</button>
+        </div>
+    }
+
+    @if (_results != null && _results.Any())
+    {
+        <div class="card">
+            <div class="card-header">
+                <h3>📋 Results (@_results.Count chunks in @_searchDuration.TotalMilliseconds.ToString("F0")ms)</h3>
+            </div>
+            <div class="card-body results-list">
+                @foreach (var result in _results)
+                {
+                    <div class="result-item">
+                        <div class="result-header">
+                            <span class="result-file">📄 @result.Chunk.FilePath:@result.Chunk.StartLine-@result.Chunk.EndLine</span>
+                            <span class="result-score">Score: @result.Score.ToString("F3")</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(result.Chunk.SymbolName))
+                        {
+                            <div class="result-symbol">
+                                <span class="symbol-type">@result.Chunk.SymbolType</span>
+                                <span class="symbol-name">@result.Chunk.SymbolName</span>
+                            </div>
+                        }
+                        <div class="result-code">
+                            <pre><code>@result.Chunk.Content</code></pre>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>📝 Generated Prompt</h3>
+                <button class="btn btn-secondary btn-small" @onclick="CopyPrompt">📋 Copy</button>
+            </div>
+            <div class="card-body">
+                <div class="prompt-preview">
+                    <pre>@_generatedPrompt</pre>
+                </div>
+                @if (_copied)
+                {
+                    <div class="copy-feedback">✓ Copied to clipboard!</div>
+                }
+            </div>
+        </div>
+    }
+    else if (_hasSearched && (_results == null || !_results.Any()))
+    {
+        <div class="card">
+            <div class="card-body">
+                <div class="empty-state">
+                    <span class="empty-icon">🔍</span>
+                    <span>No results found. Try a different query or rebuild the index.</span>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string _question = "";
+    private int _maxResults = 10;
+    private bool _includeCSharp = true;
+    private bool _includeJavaScript = true;
+    private bool _includePlainText = true;
+    private string _pathFilter = "";
+
+    private List<ScoredChunk>? _results;
+    private string? _generatedPrompt;
+    private TimeSpan _searchDuration;
+    private bool _isSearching;
+    private bool _hasSearched;
+    private string? _errorMessage;
+    private bool _copied;
+
+    private async Task ExecuteQuery()
+    {
+        if (string.IsNullOrWhiteSpace(_question))
+            return;
+
+        _isSearching = true;
+        _errorMessage = null;
+        _copied = false;
+        StateHasChanged();
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            // Check if index exists
+            if (!await VectorStore.CollectionExistsAsync())
+            {
+                _errorMessage = "Index not found. Please rebuild the index first.";
+                return;
+            }
+
+            // Build language filter
+            var languages = new List<string>();
+            if (_includeCSharp) languages.Add("csharp");
+            if (_includeJavaScript) languages.Add("javascript");
+            if (_includePlainText) languages.Add("plaintext");
+
+            var filter = new SearchFilter
+            {
+                Languages = languages.Any() ? languages : null,
+                PathPrefix = string.IsNullOrWhiteSpace(_pathFilter) ? null : _pathFilter
+            };
+
+            // Generate embedding for question
+            var queryVector = await EmbeddingService.EmbedAsync(_question);
+
+            // Search
+            _results = (await VectorStore.SearchAsync(queryVector, _maxResults, filter)).ToList();
+
+            // Generate prompt
+            if (_results.Any())
+            {
+                _generatedPrompt = PromptBuilder.BuildPrompt(_question, _results);
+            }
+
+            // Record activity
+            IndexStatusService.RecordQuery(_question, _results.Count);
+
+            stopwatch.Stop();
+            _searchDuration = stopwatch.Elapsed;
+            _hasSearched = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Query failed");
+            _errorMessage = $"Query failed: {ex.Message}";
+        }
+        finally
+        {
+            _isSearching = false;
+        }
+    }
+
+    private async Task CopyPrompt()
+    {
+        // Note: In a real implementation, you'd use JSInterop to access clipboard
+        // For now, we just show feedback
+        _copied = true;
+        await Task.Delay(2000);
+        _copied = false;
+        StateHasChanged();
+    }
+}

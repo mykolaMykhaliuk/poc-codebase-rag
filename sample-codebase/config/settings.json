@@ -1,0 +1,33 @@
+{
+  "application": {
+    "name": "Sample Application",
+    "version": "1.0.0",
+    "environment": "development"
+  },
+  "database": {
+    "connectionString": "Server=localhost;Database=SampleDb;Trusted_Connection=true;",
+    "commandTimeout": 30,
+    "enableRetryOnFailure": true
+  },
+  "authentication": {
+    "tokenExpirationMinutes": 60,
+    "refreshTokenExpirationDays": 7,
+    "requireEmailConfirmation": false,
+    "allowedOrigins": [
+      "http://localhost:3000",
+      "http://localhost:5000"
+    ]
+  },
+  "logging": {
+    "level": "Information",
+    "enableConsole": true,
+    "enableFile": false,
+    "filePath": "logs/app.log"
+  },
+  "features": {
+    "enableRegistration": true,
+    "enablePasswordReset": true,
+    "maxLoginAttempts": 5,
+    "lockoutDurationMinutes": 15
+  }
+}

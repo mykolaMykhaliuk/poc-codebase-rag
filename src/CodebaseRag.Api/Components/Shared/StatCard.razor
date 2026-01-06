@@ -1,0 +1,19 @@
+@code {
+    [Parameter] public string Icon { get; set; } = "📊";
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "0";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string ColorClass { get; set; } = "";
+}
+
+<div class="stat-card @ColorClass">
+    <div class="stat-icon">@Icon</div>
+    <div class="stat-content">
+        <div class="stat-value">@Value</div>
+        <div class="stat-title">@Title</div>
+        @if (!string.IsNullOrEmpty(Subtitle))
+        {
+            <div class="stat-subtitle">@Subtitle</div>
+        }
+    </div>
+</div>

@@ -1,0 +1,298 @@
+@page "/admin/index"
+@inject IIndexStatusService IndexStatusService
+@inject IVectorStore VectorStore
+@inject ILogger<IndexStatus> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Index Status - Codebase RAG</PageTitle>
+
+<div class="page-header">
+    <h1>Index Status</h1>
+    <div class="header-actions">
+        <button class="btn btn-danger" @onclick="ClearIndex" disabled="@_isProcessing">🗑️ Clear Index</button>
+        <button class="btn btn-primary" @onclick="RebuildIndex" disabled="@_isProcessing">
+            @if (_isProcessing)
+            {
+                <span class="spinner-small"></span>
+                <span>Processing...</span>
+            }
+            else
+            {
+                <span>🔄 Rebuild</span>
+            }
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="alert @(_isError ? "alert-error" : "alert-success")">
+        @_message
+        <button class="alert-close" @onclick="() => _message = null">×</button>
+    </div>
+}
+
+<div class="index-overview">
+    <div class="card">
+        <div class="card-body">
+            <div class="index-status-row">
+                <div class="index-status-item">
+                    <span class="label">Status</span>
+                    <StatusBadge IsHealthy="@_status.IsReady" />
+                </div>
+                <div class="index-status-item">
+                    <span class="label">Last Rebuild</span>
+                    <span class="value">@FormatDate(_status.LastRebuildTime)</span>
+                </div>
+                <div class="index-status-item">
+                    <span class="label">Duration</span>
+                    <span class="value">@FormatDuration(_status.LastRebuildDuration)</span>
+                </div>
+                <div class="index-status-item">
+                    <span class="label">Total Chunks</span>
+                    <span class="value">@_statistics.TotalChunks.ToString("N0")</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="index-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3>📊 Files by Language</h3>
+        </div>
+        <div class="card-body">
+            @if (_statistics.FilesByLanguage.Any())
+            {
+                <div class="language-bars">
+                    @foreach (var lang in _statistics.FilesByLanguage.OrderByDescending(x => x.Value))
+                    {
+                        var percent = _statistics.FilesByLanguage.Values.Sum() > 0
+                            ? (double)lang.Value / _statistics.FilesByLanguage.Values.Sum() * 100
+                            : 0;
+                        <div class="language-bar-row">
+                            <span class="language-name">@GetLanguageIcon(lang.Key) @lang.Key</span>
+                            <div class="language-bar-container">
+                                <div class="language-bar" style="width: @percent.ToString("F0")%"></div>
+                            </div>
+                            <span class="language-count">@lang.Value</span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="empty-state">No files indexed yet</div>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>📈 Quick Stats</h3>
+        </div>
+        <div class="card-body">
+            <div class="quick-stats">
+                <div class="quick-stat">
+                    <span class="quick-stat-value">@_status.FilesProcessed</span>
+                    <span class="quick-stat-label">Files</span>
+                </div>
+                <div class="quick-stat">
+                    <span class="quick-stat-value">@_status.ChunksIndexed</span>
+                    <span class="quick-stat-label">Chunks</span>
+                </div>
+                <div class="quick-stat">
+                    <span class="quick-stat-value">@_statistics.FilesByLanguage.Count</span>
+                    <span class="quick-stat-label">Languages</span>
+                </div>
+                <div class="quick-stat">
+                    <span class="quick-stat-value">@(_status.LastErrors?.Count ?? 0)</span>
+                    <span class="quick-stat-label">Errors</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>📁 Indexed Files</h3>
+        <div class="search-box">
+            <input type="text" placeholder="Filter files..." @bind="_filterText" @bind:event="oninput" class="form-control form-control-small" />
+        </div>
+    </div>
+    <div class="card-body">
+        @{
+            var filteredFiles = GetFilteredFiles().ToList();
+        }
+        @if (filteredFiles.Any())
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>File Path</th>
+                        <th>Language</th>
+                        <th>Chunks</th>
+                        <th>Indexed At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var file in filteredFiles.Take(_displayCount))
+                    {
+                        <tr>
+                            <td class="file-path">@file.FilePath</td>
+                            <td>
+                                <span class="language-badge">@GetLanguageIcon(file.Language) @file.Language</span>
+                            </td>
+                            <td>@file.ChunkCount</td>
+                            <td>@file.IndexedAt.ToString("HH:mm:ss")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (filteredFiles.Count > _displayCount)
+            {
+                <div class="table-footer">
+                    <span>Showing @_displayCount of @filteredFiles.Count files</span>
+                    <button class="btn btn-secondary btn-small" @onclick="() => _displayCount += 50">Load More</button>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="empty-state">
+                @if (string.IsNullOrEmpty(_filterText))
+                {
+                    <span>No files indexed yet. Click "Rebuild" to index your codebase.</span>
+                }
+                else
+                {
+                    <span>No files match "@_filterText"</span>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private Services.IndexStatus _status = new();
+    private IndexStatistics _statistics = new();
+    private List<IndexedFileInfo> _indexedFiles = new();
+    private string _filterText = "";
+    private int _displayCount = 50;
+    private bool _isProcessing;
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            _status = IndexStatusService.GetStatus();
+            _statistics = await IndexStatusService.GetStatisticsAsync();
+            _indexedFiles = IndexStatusService.GetIndexedFiles().ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load index status");
+        }
+    }
+
+    private IEnumerable<IndexedFileInfo> GetFilteredFiles()
+    {
+        if (string.IsNullOrWhiteSpace(_filterText))
+            return _indexedFiles;
+
+        var filter = _filterText.ToLowerInvariant();
+        return _indexedFiles.Where(f =>
+            f.FilePath.ToLowerInvariant().Contains(filter) ||
+            f.Language.ToLowerInvariant().Contains(filter));
+    }
+
+    private async Task RebuildIndex()
+    {
+        _isProcessing = true;
+        _message = null;
+        StateHasChanged();
+
+        try
+        {
+            using var httpClient = new HttpClient { BaseAddress = new Uri("http://localhost:8080") };
+            var response = await httpClient.PostAsync("/rag/rebuild", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _message = "Index rebuilt successfully!";
+                _isError = false;
+                await LoadDataAsync();
+            }
+            else
+            {
+                _message = $"Rebuild failed: {response.StatusCode}";
+                _isError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _message = $"Error: {ex.Message}";
+            _isError = true;
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task ClearIndex()
+    {
+        _isProcessing = true;
+        _message = null;
+        StateHasChanged();
+
+        try
+        {
+            await VectorStore.DeleteCollectionAsync();
+            _message = "Index cleared";
+            _isError = false;
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _message = $"Error: {ex.Message}";
+            _isError = true;
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private static string FormatDate(DateTime? date)
+    {
+        if (date == null) return "Never";
+        return date.Value.ToString("yyyy-MM-dd HH:mm:ss");
+    }
+
+    private static string FormatDuration(TimeSpan? duration)
+    {
+        if (duration == null) return "-";
+        if (duration.Value.TotalMinutes >= 1)
+            return $"{duration.Value.TotalMinutes:F1} min";
+        return $"{duration.Value.TotalSeconds:F1}s";
+    }
+
+    private static string GetLanguageIcon(string language) => language.ToLower() switch
+    {
+        "csharp" => "🟣",
+        "javascript" => "🟡",
+        "plaintext" => "📄",
+        _ => "📁"
+    };
+}
