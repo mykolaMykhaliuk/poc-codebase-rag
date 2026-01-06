@@ -1,0 +1,348 @@
+@page "/admin/settings"
+@inject IConfigurationManager ConfigManager
+@inject IIndexStatusService IndexStatus
+@inject ILogger<Settings> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Settings - Codebase RAG</PageTitle>
+
+<div class="page-header">
+    <h1>Settings</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" @onclick="ResetToDefaults">Reset to Defaults</button>
+        <button class="btn btn-primary" @onclick="SaveSettings" disabled="@_isSaving">
+            @if (_isSaving)
+            {
+                <span class="spinner-small"></span>
+                <span>Saving...</span>
+            }
+            else
+            {
+                <span>💾 Save Settings</span>
+            }
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="alert @(_isError ? "alert-error" : "alert-success")">
+        @_message
+        <button class="alert-close" @onclick="() => _message = null">×</button>
+    </div>
+}
+
+@if (_settings != null)
+{
+    <div class="settings-grid">
+        <!-- Codebase Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📂 Codebase</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label>Root Path</label>
+                    <input type="text" @bind="_settings.Codebase.RootPath" class="form-control" />
+                    <span class="form-hint">Path to the codebase directory (in container: /codebase)</span>
+                </div>
+                <div class="form-group">
+                    <label>Excluded Folders</label>
+                    <input type="text" @bind="_excludedFolders" class="form-control" />
+                    <span class="form-hint">Comma-separated list (e.g., bin, obj, node_modules)</span>
+                </div>
+                <div class="form-group">
+                    <label>Excluded Files</label>
+                    <input type="text" @bind="_excludedFiles" class="form-control" />
+                    <span class="form-hint">Comma-separated patterns (e.g., *.min.js, *.designer.cs)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Embedding Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h3>🔗 Embedding</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label>Provider</label>
+                    <select @bind="_settings.Embedding.Provider" class="form-control">
+                        <option value="OpenAI">OpenAI</option>
+                        <option value="AzureOpenAI">Azure OpenAI</option>
+                        <option value="Ollama">Ollama (Local)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Base URL</label>
+                    <input type="text" @bind="_settings.Embedding.BaseUrl" class="form-control" />
+                </div>
+                <div class="form-group">
+                    <label>Model</label>
+                    <input type="text" @bind="_settings.Embedding.Model" class="form-control" />
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <div class="input-with-toggle">
+                        <input type="@(_showApiKey ? "text" : "password")" @bind="_settings.Embedding.ApiKey" class="form-control" />
+                        <button type="button" class="btn-toggle" @onclick="() => _showApiKey = !_showApiKey">
+                            @(_showApiKey ? "🙈" : "👁️")
+                        </button>
+                    </div>
+                    <span class="form-hint">Leave empty to use environment variable</span>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dimensions</label>
+                        <input type="number" @bind="_settings.Embedding.Dimensions" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label>Batch Size</label>
+                        <input type="number" @bind="_settings.Embedding.BatchSize" class="form-control" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chunking Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h3>✂️ Chunking</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Max Chunk Size</label>
+                        <input type="number" @bind="_settings.Chunking.MaxChunkSize" class="form-control" />
+                        <span class="form-hint">Characters per chunk</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Chunk Overlap</label>
+                        <input type="number" @bind="_settings.Chunking.ChunkOverlap" class="form-control" />
+                        <span class="form-hint">Overlap between chunks</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" @bind="_settings.Chunking.PreferSemanticBoundaries" />
+                        Prefer semantic boundaries (methods, classes)
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prompt Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📝 Prompt</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Max Context Chunks</label>
+                        <input type="number" @bind="_settings.Prompt.MaxContextChunks" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label>Max Context Tokens</label>
+                        <input type="number" @bind="_settings.Prompt.MaxContextTokens" class="form-control" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>System Instructions</label>
+                    <textarea @bind="_settings.Prompt.SystemInstructions" class="form-control" rows="4"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vector Store Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h3>🗄️ Vector Store</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Host</label>
+                        <input type="text" @bind="_settings.VectorStore.Host" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label>Port</label>
+                        <input type="number" @bind="_settings.VectorStore.Port" class="form-control" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Collection Name</label>
+                    <input type="text" @bind="_settings.VectorStore.CollectionName" class="form-control" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Parser Mapping -->
+        <div class="card card-wide">
+            <div class="card-header">
+                <h3>🗂️ Parser Mapping</h3>
+                <button class="btn btn-small" @onclick="AddParserMapping">+ Add</button>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Extension</th>
+                            <th>Parser</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var mapping in _parserMappings)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="text" @bind="mapping.Extension" class="form-control form-control-small" />
+                                </td>
+                                <td>
+                                    <select @bind="mapping.Parser" class="form-control form-control-small">
+                                        <option value="csharp">csharp</option>
+                                        <option value="javascript">javascript</option>
+                                        <option value="plaintext">plaintext</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <button class="btn btn-danger btn-small" @onclick="() => RemoveParserMapping(mapping)">🗑️</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <LoadingSpinner Text="Loading settings..." />
+}
+
+@code {
+    private RagSettings? _settings;
+    private string _excludedFolders = "";
+    private string _excludedFiles = "";
+    private List<ParserMappingItem> _parserMappings = new();
+    private bool _showApiKey;
+    private bool _isSaving;
+    private string? _message;
+    private bool _isError;
+
+    protected override void OnInitialized()
+    {
+        LoadSettings();
+    }
+
+    private void LoadSettings()
+    {
+        try
+        {
+            _settings = ConfigManager.GetCurrentSettings();
+
+            // Convert lists to comma-separated strings for editing
+            _excludedFolders = string.Join(", ", _settings.Codebase.ExcludedFolders);
+            _excludedFiles = string.Join(", ", _settings.Codebase.ExcludedFiles);
+
+            // Convert dictionary to list for editing
+            _parserMappings = _settings.ParserMapping
+                .Select(kvp => new ParserMappingItem { Extension = kvp.Key, Parser = kvp.Value })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load settings");
+            _message = "Failed to load settings";
+            _isError = true;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        if (_settings == null) return;
+
+        _isSaving = true;
+        _message = null;
+        StateHasChanged();
+
+        try
+        {
+            // Convert comma-separated strings back to lists
+            _settings.Codebase.ExcludedFolders = _excludedFolders
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .ToList();
+
+            _settings.Codebase.ExcludedFiles = _excludedFiles
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .ToList();
+
+            // Convert list back to dictionary
+            _settings.ParserMapping = _parserMappings
+                .Where(m => !string.IsNullOrWhiteSpace(m.Extension))
+                .ToDictionary(m => m.Extension, m => m.Parser);
+
+            // Validate
+            var (isValid, errors) = ConfigManager.ValidateSettings(_settings);
+            if (!isValid)
+            {
+                _message = "Validation errors: " + string.Join(", ", errors);
+                _isError = true;
+                return;
+            }
+
+            await ConfigManager.SaveSettingsAsync(_settings);
+            IndexStatus.RecordSettingsChange("Multiple settings", "various", "updated");
+
+            _message = "Settings saved successfully! Rebuild the index to apply changes.";
+            _isError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save settings");
+            _message = $"Error saving settings: {ex.Message}";
+            _isError = true;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task ResetToDefaults()
+    {
+        try
+        {
+            await ConfigManager.ResetToDefaultsAsync();
+            LoadSettings();
+            _message = "Settings reset to defaults";
+            _isError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to reset settings");
+            _message = $"Error: {ex.Message}";
+            _isError = true;
+        }
+    }
+
+    private void AddParserMapping()
+    {
+        _parserMappings.Add(new ParserMappingItem { Extension = ".new", Parser = "plaintext" });
+    }
+
+    private void RemoveParserMapping(ParserMappingItem mapping)
+    {
+        _parserMappings.Remove(mapping);
+    }
+
+    private class ParserMappingItem
+    {
+        public string Extension { get; set; } = "";
+        public string Parser { get; set; } = "plaintext";
+    }
+}

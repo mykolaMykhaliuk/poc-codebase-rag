@@ -1,0 +1,9 @@
+@code {
+    [Parameter] public bool IsHealthy { get; set; }
+    [Parameter] public string? Text { get; set; }
+}
+
+<span class="status-badge @(IsHealthy ? "status-healthy" : "status-error")">
+    <span class="status-dot"></span>
+    @(Text ?? (IsHealthy ? "Ready" : "Not Ready"))
+</span>

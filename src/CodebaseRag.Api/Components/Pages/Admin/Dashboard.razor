@@ -1,0 +1,212 @@
+@page "/admin"
+@page "/admin/"
+@inject IIndexStatusService IndexStatus
+@inject IVectorStore VectorStore
+@inject IConfigurationManager ConfigManager
+@inject ILogger<Dashboard> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard - Codebase RAG</PageTitle>
+
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <button class="btn btn-primary" @onclick="RebuildIndex" disabled="@_isRebuilding">
+        @if (_isRebuilding)
+        {
+            <span class="spinner-small"></span>
+            <span>Rebuilding...</span>
+        }
+        else
+        {
+            <span>🔄 Rebuild Index</span>
+        }
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="alert @(_isError ? "alert-error" : "alert-success")">
+        @_message
+        <button class="alert-close" @onclick="() => _message = null">×</button>
+    </div>
+}
+
+<div class="stats-grid">
+    <StatCard Icon="📁" Title="Files Indexed" Value="@_status.FilesProcessed.ToString("N0")" />
+    <StatCard Icon="📦" Title="Chunks" Value="@_chunksCount.ToString("N0")" />
+    <StatCard Icon="⏱️" Title="Last Build" Value="@FormatLastBuild()" Subtitle="@FormatDuration()" />
+    <StatCard Icon="@(_status.IsReady ? "✅" : "⚠️")" Title="Status" Value="@(_status.IsReady ? "Ready" : "Not Ready")" ColorClass="@(_status.IsReady ? "" : "stat-warning")" />
+</div>
+
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3>System Information</h3>
+        </div>
+        <div class="card-body">
+            <div class="info-row">
+                <span class="info-label">Index Status</span>
+                <StatusBadge IsHealthy="@_status.IsReady" />
+            </div>
+            <div class="info-row">
+                <span class="info-label">Codebase Path</span>
+                <span class="info-value">@_settings?.Codebase.RootPath</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Vector Store</span>
+                <span class="info-value">Qdrant (@_settings?.VectorStore.Host:@_settings?.VectorStore.Port)</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Embedding Model</span>
+                <span class="info-value">@_settings?.Embedding.Model</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Recent Activity</h3>
+        </div>
+        <div class="card-body activity-list">
+            @if (_activities.Any())
+            {
+                @foreach (var activity in _activities)
+                {
+                    <div class="activity-item">
+                        <span class="activity-icon">@activity.Icon</span>
+                        <div class="activity-content">
+                            <span class="activity-action">@activity.Action</span>
+                            <span class="activity-details">@activity.Details</span>
+                        </div>
+                        <span class="activity-time">@FormatTimeAgo(activity.Timestamp)</span>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="empty-state">No recent activity</div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (_status.LastErrors.Any())
+{
+    <div class="card card-error">
+        <div class="card-header">
+            <h3>⚠️ Last Build Errors</h3>
+        </div>
+        <div class="card-body">
+            <ul class="error-list">
+                @foreach (var error in _status.LastErrors.Take(10))
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
+@code {
+    private IndexStatus _status = new();
+    private RagSettings? _settings;
+    private long _chunksCount;
+    private List<ActivityLogEntry> _activities = new();
+    private bool _isRebuilding;
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            _status = IndexStatus.GetStatus();
+            _settings = ConfigManager.GetCurrentSettings();
+            _activities = IndexStatus.GetRecentActivity(10).ToList();
+
+            try
+            {
+                _chunksCount = await VectorStore.GetPointCountAsync();
+            }
+            catch
+            {
+                _chunksCount = _status.ChunksIndexed;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load dashboard data");
+        }
+    }
+
+    private async Task RebuildIndex()
+    {
+        _isRebuilding = true;
+        _message = null;
+        StateHasChanged();
+
+        try
+        {
+            using var httpClient = new HttpClient { BaseAddress = new Uri("http://localhost:8080") };
+            var response = await httpClient.PostAsync("/rag/rebuild", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _message = "Index rebuilt successfully!";
+                _isError = false;
+            }
+            else
+            {
+                _message = $"Rebuild failed: {response.StatusCode}";
+                _isError = true;
+            }
+
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _message = $"Error: {ex.Message}";
+            _isError = true;
+            Logger.LogError(ex, "Failed to rebuild index");
+        }
+        finally
+        {
+            _isRebuilding = false;
+        }
+    }
+
+    private string FormatLastBuild()
+    {
+        if (_status.LastRebuildTime == null)
+            return "Never";
+
+        return FormatTimeAgo(_status.LastRebuildTime.Value);
+    }
+
+    private string FormatDuration()
+    {
+        if (_status.LastRebuildDuration == null)
+            return "";
+
+        var duration = _status.LastRebuildDuration.Value;
+        if (duration.TotalMinutes >= 1)
+            return $"{duration.TotalMinutes:F1} min";
+        return $"{duration.TotalSeconds:F1}s";
+    }
+
+    private static string FormatTimeAgo(DateTime time)
+    {
+        var diff = DateTime.UtcNow - time;
+
+        if (diff.TotalMinutes < 1) return "Just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
+        return time.ToString("MMM dd");
+    }
+}

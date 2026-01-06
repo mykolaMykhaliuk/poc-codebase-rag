@@ -1,3 +1,4 @@
+using CodebaseRag.Api.Components;
 using CodebaseRag.Api.Configuration;
 using CodebaseRag.Api.Endpoints;
 using CodebaseRag.Api.Parsing;
@@ -26,6 +27,10 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// Add Blazor Server for Admin UI
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
 // Register parsers
 builder.Services.AddSingleton<ICodeParser, PlainTextParser>();
 builder.Services.AddSingleton<ICodeParser, CSharpParser>();
@@ -36,6 +41,10 @@ builder.Services.AddSingleton<IParserFactory, ParserFactory>();
 builder.Services.AddSingleton<ICodebaseScanner, CodebaseScanner>();
 builder.Services.AddSingleton<IVectorStore, QdrantVectorStore>();
 builder.Services.AddSingleton<IPromptBuilder, PromptBuilder>();
+
+// Register Admin UI services
+builder.Services.AddSingleton<IIndexStatusService, IndexStatusService>();
+builder.Services.AddSingleton<IConfigurationManager, ConfigurationManager>();
 
 // Register HTTP client for embedding service
 builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>();
@@ -50,11 +59,19 @@ app.UseSwaggerUI(options =>
     options.RoutePrefix = "swagger";
 });
 
-// Map endpoints
+// Serve static files (CSS, JS)
+app.UseStaticFiles();
+app.UseAntiforgery();
+
+// Map Blazor components for Admin UI
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+// Map API endpoints
 app.MapHealthEndpoints();
 app.MapRagEndpoints();
 
-// Redirect root to Swagger
-app.MapGet("/", () => Results.Redirect("/swagger"));
+// Redirect root to Admin UI
+app.MapGet("/", () => Results.Redirect("/admin"));
 
 app.Run();

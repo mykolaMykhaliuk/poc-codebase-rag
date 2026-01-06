@@ -33,13 +33,20 @@ public static class RagEndpoints
         IParserFactory parserFactory,
         IEmbeddingService embeddingService,
         IVectorStore vectorStore,
+        IIndexStatusService indexStatusService,
         IOptions<RagSettings> settings,
-        ILogger<RagEndpoints> logger,
+        ILogger<RagEndpointsLogger> logger,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
         var response = new RebuildResponse();
         var chunkingSettings = settings.Value.Chunking;
+
+        // Clear tracked files for fresh rebuild
+        if (indexStatusService is IndexStatusService statusService)
+        {
+            statusService.ClearIndexedFiles();
+        }
 
         try
         {
@@ -67,6 +74,12 @@ public static class RagEndpoints
                     var chunks = parser.Parse(file.RelativePath, content, chunkingSettings).ToList();
                     allChunks.AddRange(chunks);
                     response.FilesProcessed++;
+
+                    // Track indexed file
+                    if (indexStatusService is IndexStatusService iss)
+                    {
+                        iss.RecordIndexedFile(file.RelativePath, chunks.FirstOrDefault()?.Language ?? "unknown", chunks.Count);
+                    }
 
                     logger.LogDebug("Parsed {FilePath}: {ChunkCount} chunks", file.RelativePath, chunks.Count);
                 }
@@ -123,6 +136,13 @@ public static class RagEndpoints
             response.DurationMs = stopwatch.ElapsedMilliseconds;
             response.Success = response.Errors.Count == 0;
 
+            // Record rebuild in status service
+            indexStatusService.RecordRebuild(
+                response.FilesProcessed,
+                response.ChunksIndexed,
+                stopwatch.Elapsed,
+                response.Errors);
+
             logger.LogInformation("Index rebuild completed: {FilesProcessed} files, {ChunksIndexed} chunks, {ErrorCount} errors, {DurationMs}ms",
                 response.FilesProcessed, response.ChunksIndexed, response.Errors.Count, response.DurationMs);
 
@@ -139,6 +159,13 @@ public static class RagEndpoints
             response.Errors.Add($"Fatal error: {ex.Message}");
             response.DurationMs = stopwatch.ElapsedMilliseconds;
 
+            // Record failed rebuild
+            indexStatusService.RecordRebuild(
+                response.FilesProcessed,
+                response.ChunksIndexed,
+                stopwatch.Elapsed,
+                response.Errors);
+
             return Results.Json(response, statusCode: 500);
         }
     }
@@ -148,8 +175,9 @@ public static class RagEndpoints
         IEmbeddingService embeddingService,
         IVectorStore vectorStore,
         IPromptBuilder promptBuilder,
+        IIndexStatusService indexStatusService,
         IOptions<RagSettings> settings,
-        ILogger<RagEndpoints> logger,
+        ILogger<RagEndpointsLogger> logger,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Question))
@@ -195,6 +223,9 @@ public static class RagEndpoints
 
             logger.LogInformation("Found {ResultCount} relevant chunks", results.Count);
 
+            // Record query in status service
+            indexStatusService.RecordQuery(request.Question, results.Count);
+
             // Build prompt
             var prompt = promptBuilder.BuildPrompt(request.Question, results);
 
@@ -228,4 +259,4 @@ public static class RagEndpoints
 }
 
 // Helper class for structured logging
-file class RagEndpoints { }
+file class RagEndpointsLogger { }

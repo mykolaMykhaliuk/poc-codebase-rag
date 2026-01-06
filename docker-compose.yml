@@ -16,6 +16,7 @@ services:
       - Rag__VectorStore__Host=qdrant
     volumes:
       - ${CODEBASE_PATH:-./sample-codebase}:/codebase:ro
+      - app_settings:/app/settings
     depends_on:
       qdrant:
         condition: service_healthy
@@ -47,3 +48,4 @@ services:
 
 volumes:
   qdrant_data:
+  app_settings:

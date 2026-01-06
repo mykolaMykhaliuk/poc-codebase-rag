@@ -1,0 +1,37 @@
+@using Microsoft.AspNetCore.Components.Routing
+
+<nav class="nav-menu">
+    <NavLink href="/admin" Match="NavLinkMatch.All" class="nav-link">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+    </NavLink>
+
+    <NavLink href="/admin/settings" Match="NavLinkMatch.Prefix" class="nav-link">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-text">Settings</span>
+    </NavLink>
+
+    <NavLink href="/admin/index" Match="NavLinkMatch.Prefix" class="nav-link">
+        <span class="nav-icon">📊</span>
+        <span class="nav-text">Index Status</span>
+    </NavLink>
+
+    <NavLink href="/admin/query" Match="NavLinkMatch.Prefix" class="nav-link">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-text">Query</span>
+    </NavLink>
+
+    <div class="nav-divider"></div>
+
+    <a href="/swagger" target="_blank" class="nav-link external">
+        <span class="nav-icon">📖</span>
+        <span class="nav-text">API Docs</span>
+        <span class="external-icon">↗</span>
+    </a>
+
+    <a href="/health" target="_blank" class="nav-link external">
+        <span class="nav-icon">💚</span>
+        <span class="nav-text">Health Check</span>
+        <span class="external-icon">↗</span>
+    </a>
+</nav>
