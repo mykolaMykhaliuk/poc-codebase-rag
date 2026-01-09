@@ -24,7 +24,15 @@ COPY --from=build /app/publish .
 # Configure ASP.NET Core
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
+
+# MCP Server is enabled by default (HTTP/SSE transport on /mcp endpoint)
+ENV MCP_ENABLED=true
+
 EXPOSE 8080
+
+# Health check (checks REST API health endpoint)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Set entrypoint
 ENTRYPOINT ["dotnet", "CodebaseRag.Api.dll"]

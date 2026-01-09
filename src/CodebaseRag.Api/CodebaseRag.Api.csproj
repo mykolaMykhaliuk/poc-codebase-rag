@@ -20,6 +20,10 @@
 
     <!-- HTTP client extensions -->
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+
+    <!-- MCP (Model Context Protocol) Server -->
+    <PackageReference Include="ModelContextProtocol" Version="0.1.0-preview.15" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.1.0-preview.15" />
   </ItemGroup>
 
 </Project>

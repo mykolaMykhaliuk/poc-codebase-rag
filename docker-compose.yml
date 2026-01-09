@@ -10,10 +10,14 @@ services:
       - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      # Embedding API configuration
       - Rag__Embedding__ApiKey=${EMBEDDING_API_KEY:-}
       - Rag__Embedding__BaseUrl=${EMBEDDING_BASE_URL:-https://api.openai.com/v1}
       - Rag__Embedding__Model=${EMBEDDING_MODEL:-text-embedding-3-small}
+      # Qdrant connection
       - Rag__VectorStore__Host=qdrant
+      # MCP Server (enabled by default, HTTP/SSE on /mcp)
+      - MCP_ENABLED=true
     volumes:
       - ${CODEBASE_PATH:-./sample-codebase}:/codebase:ro
       - app_settings:/app/settings
@@ -27,6 +31,10 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    labels:
+      - "mcp.server=codebase-rag"
+      - "mcp.transport=sse"
+      - "mcp.endpoint=/mcp"
 
   qdrant:
     image: qdrant/qdrant:v1.7.4
