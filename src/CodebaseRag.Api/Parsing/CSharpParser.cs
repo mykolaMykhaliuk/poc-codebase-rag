@@ -14,7 +14,7 @@ public class CSharpParser : ICodeParser
         if (string.IsNullOrWhiteSpace(content))
             yield break;
 
-        SyntaxTree tree;
+        SyntaxTree? tree = null;
         try
         {
             tree = CSharpSyntaxTree.ParseText(content);
@@ -22,6 +22,11 @@ public class CSharpParser : ICodeParser
         catch
         {
             // Fall back to plain text parsing if Roslyn fails
+            tree = null;
+        }
+
+        if (tree == null)
+        {
             var fallback = new PlainTextParser();
             foreach (var chunk in fallback.Parse(filePath, content, settings))
             {

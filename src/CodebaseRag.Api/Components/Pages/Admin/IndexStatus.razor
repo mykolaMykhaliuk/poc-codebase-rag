@@ -1,8 +1,8 @@
 @page "/admin/index"
 @inject IIndexStatusService IndexStatusService
 @inject IVectorStore VectorStore
-@inject ILogger<IndexStatus> Logger
-@rendermode InteractiveServer
+@inject ILogger<CodebaseRag.Api.Components.Pages.Admin.IndexStatus> Logger
+@rendermode @(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode())
 
 <PageTitle>Index Status - Codebase RAG</PageTitle>
 

@@ -4,7 +4,7 @@
 @inject IPromptBuilder PromptBuilder
 @inject IIndexStatusService IndexStatusService
 @inject ILogger<Query> Logger
-@rendermode InteractiveServer
+@rendermode @(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode())
 
 <PageTitle>Query - Codebase RAG</PageTitle>
 

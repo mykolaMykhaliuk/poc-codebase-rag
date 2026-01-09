@@ -259,4 +259,4 @@ public static class RagEndpoints
 }
 
 // Helper class for structured logging
-file class RagEndpointsLogger { }
+internal class RagEndpointsLogger { }
