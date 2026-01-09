@@ -2,6 +2,7 @@
 @inject Services.IConfigurationManager ConfigManager
 @inject IIndexStatusService IndexStatus
 @inject ILogger<Settings> Logger
+@inject IJSRuntime JSRuntime
 @rendermode @(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode())
 
 <PageTitle>Settings - Codebase RAG</PageTitle>
@@ -9,6 +10,11 @@
 <div class="page-header">
     <h1>Settings</h1>
     <div class="header-actions">
+        <button class="btn btn-secondary" @onclick="DownloadSettings">📥 Download JSON</button>
+        <label class="btn btn-secondary" style="margin: 0; cursor: pointer;">
+            📤 Upload JSON
+            <InputFile OnChange="UploadSettings" accept=".json" style="display: none;" />
+        </label>
         <button class="btn btn-secondary" @onclick="ResetToDefaults">Reset to Defaults</button>
         <button class="btn btn-primary" @onclick="SaveSettings" disabled="@_isSaving">
             @if (_isSaving)
@@ -338,6 +344,108 @@ else
     private void RemoveParserMapping(ParserMappingItem mapping)
     {
         _parserMappings.Remove(mapping);
+    }
+
+    private async Task DownloadSettings()
+    {
+        try
+        {
+            if (_settings == null) return;
+
+            // Update settings with current form values
+            _settings.Codebase.ExcludedFolders = _excludedFolders
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .ToList();
+
+            _settings.Codebase.ExcludedFiles = _excludedFiles
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .ToList();
+
+            _settings.ParserMapping = _parserMappings
+                .Where(m => !string.IsNullOrWhiteSpace(m.Extension))
+                .ToDictionary(m => m.Extension, m => m.Parser);
+
+            // Serialize to JSON
+            var json = System.Text.Json.JsonSerializer.Serialize(_settings, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            // Download file
+            var fileName = $"codebase-rag-settings-{DateTime.UtcNow:yyyy-MM-dd-HHmmss}.json";
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, json);
+
+            _message = "Settings downloaded successfully";
+            _isError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to download settings");
+            _message = $"Error downloading settings: {ex.Message}";
+            _isError = true;
+        }
+    }
+
+    private async Task UploadSettings(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file == null) return;
+
+            // Read file content
+            using var stream = file.OpenReadStream(maxAllowedSize: 1024 * 1024); // 1MB max
+            using var reader = new System.IO.StreamReader(stream);
+            var json = await reader.ReadToEndAsync();
+
+            // Deserialize JSON
+            var uploadedSettings = System.Text.Json.JsonSerializer.Deserialize<RagSettings>(json,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+            if (uploadedSettings == null)
+            {
+                _message = "Invalid settings file";
+                _isError = true;
+                return;
+            }
+
+            // Validate settings
+            var (isValid, errors) = ConfigManager.ValidateSettings(uploadedSettings);
+            if (!isValid)
+            {
+                _message = "Validation errors: " + string.Join(", ", errors);
+                _isError = true;
+                return;
+            }
+
+            // Apply settings
+            _settings = uploadedSettings;
+
+            // Update form fields
+            _excludedFolders = string.Join(", ", _settings.Codebase.ExcludedFolders);
+            _excludedFiles = string.Join(", ", _settings.Codebase.ExcludedFiles);
+            _parserMappings = _settings.ParserMapping
+                .Select(kvp => new ParserMappingItem { Extension = kvp.Key, Parser = kvp.Value })
+                .ToList();
+
+            // Save settings
+            await ConfigManager.SaveSettingsAsync(_settings);
+            IndexStatus.RecordSettingsChange("Settings imported", "file", file.Name);
+
+            _message = $"Settings uploaded from '{file.Name}' successfully! Rebuild the index to apply changes.";
+            _isError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to upload settings");
+            _message = $"Error uploading settings: {ex.Message}";
+            _isError = true;
+        }
     }
 
     private class ParserMappingItem

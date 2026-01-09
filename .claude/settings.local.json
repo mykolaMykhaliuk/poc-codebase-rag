@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(docker compose:*)",
+      "Bash(curl:*)",
+      "Bash(docker inspect:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(docker exec:*)"
     ]
   }
 }

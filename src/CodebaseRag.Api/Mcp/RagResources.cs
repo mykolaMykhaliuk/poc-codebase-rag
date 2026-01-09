@@ -139,7 +139,7 @@ public class RagResourceProvider
             {
                 rootPath = _settings.Codebase.RootPath,
                 excludedFolders = _settings.Codebase.ExcludedFolders,
-                excludedPatterns = _settings.Codebase.ExcludedPatterns
+                excludedPatterns = _settings.Codebase.ExcludedFiles
             },
             embedding = new
             {
@@ -150,7 +150,7 @@ public class RagResourceProvider
             chunking = new
             {
                 maxChunkSize = _settings.Chunking.MaxChunkSize,
-                overlap = _settings.Chunking.Overlap
+                overlap = _settings.Chunking.ChunkOverlap
             },
             prompt = new
             {

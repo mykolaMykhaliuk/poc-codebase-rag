@@ -81,10 +81,10 @@ app.MapRazorComponents<App>()
 app.MapHealthEndpoints();
 app.MapRagEndpoints();
 
-// Map MCP Server endpoint (HTTP/SSE transport)
-app.MapMcp();
-
 // Redirect root to Admin UI
-app.MapGet("/", () => Results.Redirect("/admin"));
+app.MapGet("/", () => Results.Redirect("/admin/"));
+
+// Map MCP Server endpoint (HTTP/SSE transport)
+app.MapMcp("/mcp");
 
 app.Run();
