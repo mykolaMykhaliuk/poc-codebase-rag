@@ -45,7 +45,7 @@ builder.Services.AddSingleton<IPromptBuilder, PromptBuilder>();
 
 // Register Admin UI services
 builder.Services.AddSingleton<IIndexStatusService, IndexStatusService>();
-builder.Services.AddSingleton<IConfigurationManager, ConfigurationManager>();
+builder.Services.AddSingleton<CodebaseRag.Api.Services.IConfigurationManager, CodebaseRag.Api.Services.ConfigurationManager>();
 
 // Register HTTP client for embedding service
 builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>();

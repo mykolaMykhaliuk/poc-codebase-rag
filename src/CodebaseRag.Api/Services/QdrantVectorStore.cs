@@ -141,7 +141,7 @@ public class QdrantVectorStore : IVectorStore
                             Key = "language",
                             Match = new Match
                             {
-                                Any = new RepeatedStrings { Strings = { filter.Languages } }
+                                Keywords = new RepeatedStrings { Strings = { filter.Languages } }
                             }
                         }
                     });

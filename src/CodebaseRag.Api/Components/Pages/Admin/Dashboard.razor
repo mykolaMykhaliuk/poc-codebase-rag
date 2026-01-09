@@ -2,9 +2,9 @@
 @page "/admin/"
 @inject IIndexStatusService IndexStatus
 @inject IVectorStore VectorStore
-@inject IConfigurationManager ConfigManager
+@inject Services.IConfigurationManager ConfigManager
 @inject ILogger<Dashboard> Logger
-@rendermode InteractiveServer
+@rendermode @(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode())
 
 <PageTitle>Dashboard - Codebase RAG</PageTitle>
 
@@ -108,7 +108,7 @@
 }
 
 @code {
-    private IndexStatus _status = new();
+    private Services.IndexStatus _status = new();
     private RagSettings? _settings;
     private long _chunksCount;
     private List<ActivityLogEntry> _activities = new();
