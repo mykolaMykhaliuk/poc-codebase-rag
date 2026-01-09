@@ -7,6 +7,7 @@ A **Proof of Concept** for a "Chat with Code" RAG (Retrieval-Augmented Generatio
 - **Code Indexing**: Parses C# and JavaScript files into semantic chunks
 - **Vector Search**: Uses Qdrant for efficient similarity search
 - **LLM-Agnostic**: Returns assembled prompts, no inference performed
+- **MCP Server**: Built-in Model Context Protocol server for Claude integration
 - **Docker-Ready**: Single `docker compose up` deployment
 - **Extensible**: Add new parsers via configuration
 
@@ -112,6 +113,75 @@ Queries the codebase and returns an assembled prompt.
 }
 ```
 
+## MCP Server
+
+This service includes a built-in **Model Context Protocol (MCP)** server, enabling direct integration with Claude Desktop, Claude Code, and other MCP-compatible AI assistants.
+
+### MCP Endpoint
+
+The MCP server runs on the same port as the REST API using HTTP/SSE transport:
+
+- **URL**: `http://localhost:5000/mcp`
+- **Transport**: Server-Sent Events (SSE)
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `QueryCodebase` | Query the codebase to find relevant code for answering questions |
+| `RebuildIndex` | Rebuild the codebase vector index |
+| `GetHealth` | Check system health and index status |
+| `GetIndexStats` | Get detailed statistics about the indexed codebase |
+
+### MCP Resources
+
+| Resource URI | Description |
+|--------------|-------------|
+| `rag://index/status` | Current index status and statistics |
+| `rag://index/files` | List of all indexed files |
+| `rag://config/settings` | Current RAG configuration |
+| `rag://activity/recent` | Recent activity log |
+
+### Claude Desktop Integration
+
+Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "codebase-rag": {
+      "url": "http://localhost:5000/mcp",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+### Claude Code Integration
+
+For Claude Code, add to your MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "codebase-rag": {
+      "type": "sse",
+      "url": "http://localhost:5000/mcp"
+    }
+  }
+}
+```
+
+### Example MCP Tool Usage
+
+Once connected, you can interact with your codebase through natural language:
+
+```
+"Query the codebase for how user authentication works"
+"Rebuild the index to pick up recent changes"
+"Show me the health status of the RAG system"
+```
+
 ## Configuration
 
 Configuration is managed via `appsettings.json` and environment variables.
@@ -124,6 +194,7 @@ Configuration is managed via `appsettings.json` and environment variables.
 | `EMBEDDING_BASE_URL` | Embedding API base URL | `https://api.openai.com/v1` |
 | `EMBEDDING_MODEL` | Embedding model name | `text-embedding-3-small` |
 | `CODEBASE_PATH` | Path to codebase | `./sample-codebase` |
+| `MCP_ENABLED` | Enable MCP server | `true` |
 
 ### Parser Mapping
 
@@ -196,6 +267,7 @@ Falls back to **plain text chunking** with configurable overlap.
 │       ├── Configuration/     # Settings classes
 │       ├── Contracts/         # Request/response models
 │       ├── Endpoints/         # API endpoints
+│       ├── Mcp/               # MCP server tools & resources
 │       ├── Parsing/           # Code parsers
 │       ├── Services/          # Business logic
 │       └── Program.cs         # Entry point

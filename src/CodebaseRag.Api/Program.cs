@@ -1,6 +1,7 @@
 using CodebaseRag.Api.Components;
 using CodebaseRag.Api.Configuration;
 using CodebaseRag.Api.Endpoints;
+using CodebaseRag.Api.Mcp;
 using CodebaseRag.Api.Parsing;
 using CodebaseRag.Api.Services;
 
@@ -49,6 +50,15 @@ builder.Services.AddSingleton<IConfigurationManager, ConfigurationManager>();
 // Register HTTP client for embedding service
 builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>();
 
+// Register MCP resource provider
+builder.Services.AddSingleton<RagResourceProvider>();
+
+// Configure MCP Server with HTTP/SSE transport
+builder.Services
+    .AddMcpServer()
+    .WithHttpTransport()
+    .WithToolsFromAssembly();
+
 var app = builder.Build();
 
 // Configure middleware
@@ -70,6 +80,9 @@ app.MapRazorComponents<App>()
 // Map API endpoints
 app.MapHealthEndpoints();
 app.MapRagEndpoints();
+
+// Map MCP Server endpoint (HTTP/SSE transport)
+app.MapMcp();
 
 // Redirect root to Admin UI
 app.MapGet("/", () => Results.Redirect("/admin"));
