@@ -312,3 +312,135 @@ JavaScriptParser removes duplicate chunks from overlapping regex matches and sor
 - CSharpParser requires valid C# syntax (uses Roslyn)
 - JavaScriptParser is regex-based and may miss complex patterns
 - Falls back to PlainTextParser on parse failures
+
+## MCP Server Implementation
+
+### Overview
+
+The service includes a Model Context Protocol (MCP) server that enables direct integration with Claude Desktop, Claude Code, and other MCP-compatible AI assistants. The MCP server runs on the same port as the REST API using HTTP/SSE transport at `/mcp`.
+
+### Key MCP Files
+
+- `Mcp/RagTools.cs` - MCP tool definitions (QueryCodebase, RebuildIndex, GetHealth, GetIndexStats)
+- `Mcp/RagResources.cs` - MCP resource provider (index status, files, settings, activity)
+- `Program.cs` - MCP server registration and endpoint mapping
+
+### MCP Registration (Program.cs)
+
+```csharp
+// Register MCP resource provider
+builder.Services.AddSingleton<RagResourceProvider>();
+
+// Configure MCP Server with HTTP/SSE transport
+builder.Services
+    .AddMcpServer()
+    .WithHttpTransport()
+    .WithToolsFromAssembly();
+
+// Map MCP Server endpoint
+app.MapMcp("/mcp");
+```
+
+### Tool Implementation Pattern
+
+MCP tools are static methods decorated with `[McpServerTool]` and `[Description]`:
+
+```csharp
+[McpServerTool]
+[Description("Tool description for the LLM")]
+public static async Task<string> ToolName(
+    IMcpServer server,
+    // Inject any required services
+    IVectorStore vectorStore,
+    // Tool parameters with descriptions
+    [Description("Parameter description")] string param,
+    CancellationToken cancellationToken = default)
+{
+    // Implementation
+    return JsonSerializer.Serialize(response);
+}
+```
+
+### Available MCP Tools
+
+| Tool | Purpose | Key Services Used |
+|------|---------|-------------------|
+| `QueryCodebase` | Semantic code search | EmbeddingService, VectorStore, PromptBuilder |
+| `RebuildIndex` | Full index rebuild | CodebaseScanner, ParserFactory, EmbeddingService, VectorStore |
+| `GetHealth` | System health check | VectorStore, IndexStatusService |
+| `GetIndexStats` | Index statistics | IndexStatusService |
+
+### MCP Resources
+
+Resources are read-only data exposed via URI scheme `rag://`:
+
+| URI | Data Returned |
+|-----|---------------|
+| `rag://index/status` | Index state, rebuild time, statistics |
+| `rag://index/files` | All indexed files with chunk counts |
+| `rag://config/settings` | Current RAG configuration |
+| `rag://activity/recent` | Last 20 activities (queries/rebuilds) |
+
+### Adding New MCP Tools
+
+1. Add a static method to `Mcp/RagTools.cs`
+2. Decorate with `[McpServerTool]` attribute
+3. Add `[Description]` attribute for the tool and each parameter
+4. Return JSON-serialized response
+5. Tools are auto-discovered via `WithToolsFromAssembly()`
+
+**Example:**
+```csharp
+[McpServerTool]
+[Description("Get code chunk by file path and line number")]
+public static async Task<string> GetChunkByLocation(
+    IMcpServer server,
+    IVectorStore vectorStore,
+    [Description("Relative file path")] string filePath,
+    [Description("Line number")] int lineNumber,
+    CancellationToken cancellationToken = default)
+{
+    // Implementation
+}
+```
+
+### Adding New MCP Resources
+
+1. Add resource definition in `RagResourceProvider.GetResources()`
+2. Add case handler in `RagResourceProvider.ReadResourceAsync()`
+
+**Example:**
+```csharp
+// In GetResources()
+yield return new McpResource
+{
+    Uri = "rag://custom/data",
+    Name = "Custom Data",
+    Description = "Description for clients",
+    MimeType = "application/json"
+};
+
+// In ReadResourceAsync()
+"rag://custom/data" => GetCustomData(),
+```
+
+### MCP Dependencies
+
+The MCP server uses the `ModelContextProtocol.Server` NuGet package. Key types:
+- `IMcpServer` - Server instance injected into tools
+- `McpServerToolAttribute` - Marks methods as MCP tools
+- `McpResource` - Resource definition model
+
+### Testing MCP Locally
+
+1. Start the service: `docker compose up -d`
+2. Configure Claude Desktop/Code with `http://localhost:5000/mcp`
+3. Restart Claude Desktop/Code
+4. Verify connection in Claude's MCP server list
+5. Test with: "Check the health of the RAG system"
+
+### MCP Error Handling
+
+- Tool errors return JSON with `error` field
+- Connection failures surface in Claude UI
+- Check API logs for server-side issues: `docker compose logs api`

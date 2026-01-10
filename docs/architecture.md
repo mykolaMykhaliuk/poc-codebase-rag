@@ -311,3 +311,167 @@ flowchart LR
     style SDK fill:#512bd4,color:#fff
     style ALPINE fill:#0db7ed,color:#fff
 ```
+
+---
+
+## MCP Server Architecture
+
+```mermaid
+graph TB
+    subgraph "MCP Clients"
+        CD["Claude Desktop"]
+        CC["Claude Code"]
+        OTHER["Other MCP Clients"]
+    end
+
+    subgraph "codebase-rag-api"
+        subgraph "MCP Layer /mcp"
+            MCP["MCP Server<br/>HTTP/SSE Transport"]
+            TOOLS["RagTools"]
+            RES["RagResourceProvider"]
+        end
+
+        subgraph "Core Services"
+            ES[EmbeddingService]
+            VS[QdrantVectorStore]
+            CS[CodebaseScanner]
+            PB[PromptBuilder]
+            IS[IndexStatusService]
+        end
+    end
+
+    CD -->|SSE| MCP
+    CC -->|SSE| MCP
+    OTHER -->|SSE| MCP
+
+    MCP --> TOOLS
+    MCP --> RES
+
+    TOOLS --> ES
+    TOOLS --> VS
+    TOOLS --> CS
+    TOOLS --> PB
+    TOOLS --> IS
+
+    RES --> VS
+    RES --> IS
+
+    style MCP fill:#e74c3c,color:#fff
+    style TOOLS fill:#3498db,color:#fff
+    style RES fill:#9b59b6,color:#fff
+```
+
+---
+
+## MCP Tool Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Claude Client
+    participant M as MCP Server
+    participant T as RagTools
+    participant E as EmbeddingService
+    participant V as VectorStore
+    participant P as PromptBuilder
+
+    C->>M: QueryCodebase(question, options)
+    M->>T: Invoke QueryCodebase
+    T->>V: Check collection exists
+    V-->>T: Exists
+    T->>E: Embed question
+    E-->>T: Query vector
+    T->>V: Search(vector, limit, filter)
+    V-->>T: Search results
+    T->>P: BuildPrompt(question, results)
+    P-->>T: LLM-ready prompt
+    T-->>M: JSON response
+    M-->>C: {prompt, sources, metadata}
+```
+
+---
+
+## MCP Resource Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Claude Client
+    participant M as MCP Server
+    participant R as RagResourceProvider
+    participant V as VectorStore
+    participant I as IndexStatusService
+
+    C->>M: Read resource rag://index/status
+    M->>R: ReadResourceAsync("rag://index/status")
+    R->>I: GetStatus()
+    I-->>R: Status object
+    R->>V: CollectionExistsAsync()
+    V-->>R: true
+    R->>V: GetPointCountAsync()
+    V-->>R: Point count
+    R->>I: GetStatisticsAsync()
+    I-->>R: Statistics
+    R-->>M: JSON response
+    M-->>C: Index status data
+```
+
+---
+
+## MCP Tools Reference
+
+```mermaid
+graph LR
+    subgraph "MCP Tools"
+        QC["QueryCodebase<br/>Semantic Search"]
+        RI["RebuildIndex<br/>Full Reindex"]
+        GH["GetHealth<br/>System Status"]
+        GS["GetIndexStats<br/>Statistics"]
+    end
+
+    subgraph "Parameters"
+        QCP["question (required)<br/>maxResults<br/>languages[]<br/>pathFilter"]
+        RIP["force"]
+        GHP["(none)"]
+        GSP["(none)"]
+    end
+
+    QC --- QCP
+    RI --- RIP
+    GH --- GHP
+    GS --- GSP
+
+    style QC fill:#27ae60,color:#fff
+    style RI fill:#e67e22,color:#fff
+    style GH fill:#3498db,color:#fff
+    style GS fill:#9b59b6,color:#fff
+```
+
+---
+
+## MCP Resources Reference
+
+```mermaid
+graph TB
+    subgraph "MCP Resources"
+        IS["rag://index/status<br/>Index Status"]
+        IF["rag://index/files<br/>Indexed Files"]
+        CS["rag://config/settings<br/>Configuration"]
+        AR["rag://activity/recent<br/>Activity Log"]
+    end
+
+    subgraph "Data Provided"
+        ISD["isReady, indexExists<br/>totalChunks, lastRebuild<br/>filesByLanguage"]
+        IFD["File list with paths<br/>languages, chunk counts<br/>indexed timestamps"]
+        CSD["Embedding settings<br/>Chunking config<br/>Parser mappings"]
+        ARD["Last 20 activities<br/>Queries and rebuilds<br/>Timestamps"]
+    end
+
+    IS --> ISD
+    IF --> IFD
+    CS --> CSD
+    AR --> ARD
+
+    style IS fill:#2ecc71,color:#fff
+    style IF fill:#3498db,color:#fff
+    style CS fill:#e74c3c,color:#fff
+    style AR fill:#f39c12,color:#fff
+```
