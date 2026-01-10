@@ -1,0 +1,708 @@
+@page "/admin/about"
+
+<PageTitle>About - Codebase RAG</PageTitle>
+
+<div class="page-header">
+    <h1>About Codebase RAG</h1>
+</div>
+
+<div class="about-content">
+    <div class="card">
+        <div class="card-header">
+            <h3>What is Codebase RAG?</h3>
+        </div>
+        <div class="card-body">
+            <p>
+                <strong>Codebase RAG</strong> (Retrieval-Augmented Generation) is a "Chat with Code" system that enables
+                semantic search across your source code. It indexes your codebase, creates vector embeddings, and generates
+                LLM-ready prompts with relevant code context.
+            </p>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <span class="feature-icon">🔍</span>
+                    <div class="feature-text">
+                        <strong>Semantic Code Search</strong>
+                        <span>Find relevant code using natural language questions</span>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🤖</span>
+                    <div class="feature-text">
+                        <strong>LLM-Agnostic</strong>
+                        <span>Returns prompts ready for any LLM (GPT-4, Claude, etc.)</span>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔌</span>
+                    <div class="feature-text">
+                        <strong>MCP Server</strong>
+                        <span>Built-in Model Context Protocol for Claude integration</span>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📊</span>
+                    <div class="feature-text">
+                        <strong>Smart Parsing</strong>
+                        <span>C# (Roslyn), JavaScript/TypeScript, and plain text support</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Quick Start</h3>
+        </div>
+        <div class="card-body">
+            <div class="steps-list">
+                <div class="step-item">
+                    <span class="step-number">1</span>
+                    <div class="step-content">
+                        <strong>Start the Services</strong>
+                        <code class="code-block">docker compose up -d</code>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <span class="step-number">2</span>
+                    <div class="step-content">
+                        <strong>Build the Index</strong>
+                        <p>Click "Rebuild Index" on the <a href="/admin">Dashboard</a>, or use the API:</p>
+                        <code class="code-block">curl -X POST http://localhost:5000/rag/rebuild</code>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <span class="step-number">3</span>
+                    <div class="step-content">
+                        <strong>Query Your Code</strong>
+                        <p>Use the <a href="/admin/query">Query</a> page, or the API:</p>
+                        <code class="code-block">curl -X POST http://localhost:5000/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "How does authentication work?"}'</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Using the Admin UI</h3>
+        </div>
+        <div class="card-body">
+            <div class="admin-pages">
+                <div class="admin-page-item">
+                    <span class="page-icon">🏠</span>
+                    <div class="page-info">
+                        <strong><a href="/admin">Dashboard</a></strong>
+                        <p>View system status, index statistics, and recent activity. Trigger index rebuilds.</p>
+                    </div>
+                </div>
+                <div class="admin-page-item">
+                    <span class="page-icon">⚙️</span>
+                    <div class="page-info">
+                        <strong><a href="/admin/settings">Settings</a></strong>
+                        <p>Configure embedding provider, chunking parameters, parser mappings, and more.</p>
+                    </div>
+                </div>
+                <div class="admin-page-item">
+                    <span class="page-icon">📊</span>
+                    <div class="page-info">
+                        <strong><a href="/admin/index">Index Status</a></strong>
+                        <p>Browse indexed files, view statistics by language, and monitor chunk counts.</p>
+                    </div>
+                </div>
+                <div class="admin-page-item">
+                    <span class="page-icon">🔍</span>
+                    <div class="page-info">
+                        <strong><a href="/admin/query">Query</a></strong>
+                        <p>Test queries with real-time results, code previews, and generated prompts.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>MCP Server Setup</h3>
+        </div>
+        <div class="card-body">
+            <p>
+                The <strong>Model Context Protocol (MCP)</strong> enables direct integration with Claude Desktop,
+                Claude Code, and other MCP-compatible AI assistants.
+            </p>
+
+            <h4>MCP Endpoint</h4>
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">URL</span>
+                    <code class="info-value">http://localhost:5000/mcp</code>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Transport</span>
+                    <span class="info-value">Server-Sent Events (SSE)</span>
+                </div>
+            </div>
+
+            <h4>Claude Desktop Configuration</h4>
+            <p>Add to your <code>claude_desktop_config.json</code>:</p>
+            <pre class="code-block">{
+  "mcpServers": {
+    "codebase-rag": {
+      "url": "http://localhost:5000/mcp",
+      "transport": "sse"
+    }
+  }
+}</pre>
+
+            <h4>Claude Code Configuration</h4>
+            <p>Add to your MCP settings file:</p>
+            <pre class="code-block">{
+  "mcpServers": {
+    "codebase-rag": {
+      "type": "sse",
+      "url": "http://localhost:5000/mcp"
+    }
+  }
+}</pre>
+
+            <h4>Available MCP Tools</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Tool</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>QueryCodebase</code></td>
+                        <td>Query the codebase to find relevant code for answering questions</td>
+                    </tr>
+                    <tr>
+                        <td><code>RebuildIndex</code></td>
+                        <td>Rebuild the codebase vector index</td>
+                    </tr>
+                    <tr>
+                        <td><code>GetHealth</code></td>
+                        <td>Check system health and index status</td>
+                    </tr>
+                    <tr>
+                        <td><code>GetIndexStats</code></td>
+                        <td>Get detailed statistics about the indexed codebase</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>MCP Resources</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Resource URI</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>rag://index/status</code></td>
+                        <td>Current index status and statistics</td>
+                    </tr>
+                    <tr>
+                        <td><code>rag://index/files</code></td>
+                        <td>List of all indexed files</td>
+                    </tr>
+                    <tr>
+                        <td><code>rag://config/settings</code></td>
+                        <td>Current RAG configuration</td>
+                    </tr>
+                    <tr>
+                        <td><code>rag://activity/recent</code></td>
+                        <td>Recent activity log</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Example Usage</h4>
+            <p>Once connected to Claude, you can interact naturally:</p>
+            <div class="example-prompts">
+                <div class="example-prompt">"Query the codebase for how user authentication works"</div>
+                <div class="example-prompt">"Rebuild the index to pick up recent changes"</div>
+                <div class="example-prompt">"Show me the health status of the RAG system"</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>REST API Reference</h3>
+        </div>
+        <div class="card-body">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Endpoint</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="method-badge get">GET</span></td>
+                        <td><code>/health</code></td>
+                        <td>Basic health check</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge get">GET</span></td>
+                        <td><code>/health/ready</code></td>
+                        <td>Readiness probe (checks dependencies)</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge post">POST</span></td>
+                        <td><code>/rag/rebuild</code></td>
+                        <td>Rebuilds the vector index</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge post">POST</span></td>
+                        <td><code>/rag/query</code></td>
+                        <td>Queries and returns LLM-ready prompt</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="margin-top: 1rem;">
+                <a href="/swagger" target="_blank" class="btn btn-secondary">
+                    📖 View Full API Documentation (Swagger)
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Architecture Overview</h3>
+        </div>
+        <div class="card-body">
+            <pre class="architecture-diagram">
+┌─────────────────────────────────────────────────────────────┐
+│                      Docker Compose                         │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────────────┐    ┌───────────────────────────┐  │
+│  │  CodebaseRag.Api     │    │        Qdrant             │  │
+│  │  (.NET 8 Web API)    │───▶│    (Vector Database)      │  │
+│  │   + Blazor Admin UI  │    │                           │  │
+│  │   + MCP Server       │    │                           │  │
+│  │  Port: 5000          │    │  Port: 6333 (REST)        │  │
+│  └──────────┬───────────┘    │  Port: 6334 (gRPC)        │  │
+│             │                └───────────────────────────┘  │
+│             ▼                                               │
+│  ┌──────────────────────┐                                   │
+│  │  /codebase (volume)  │                                   │
+│  └──────────────────────┘                                   │
+└─────────────────────────────────────────────────────────────┘
+              │
+              ▼ (External)
+┌─────────────────────────────────────────────────────────────┐
+│              Embedding API (OpenAI, Azure, Ollama)          │
+└─────────────────────────────────────────────────────────────┘</pre>
+
+            <h4>Processing Pipeline</h4>
+            <div class="pipeline-flow">
+                <div class="pipeline-step">
+                    <span class="pipeline-icon">📁</span>
+                    <span class="pipeline-label">Scan Files</span>
+                </div>
+                <span class="pipeline-arrow">→</span>
+                <div class="pipeline-step">
+                    <span class="pipeline-icon">🔧</span>
+                    <span class="pipeline-label">Parse Code</span>
+                </div>
+                <span class="pipeline-arrow">→</span>
+                <div class="pipeline-step">
+                    <span class="pipeline-icon">🧮</span>
+                    <span class="pipeline-label">Generate Embeddings</span>
+                </div>
+                <span class="pipeline-arrow">→</span>
+                <div class="pipeline-step">
+                    <span class="pipeline-icon">💾</span>
+                    <span class="pipeline-label">Store in Qdrant</span>
+                </div>
+            </div>
+
+            <h4>Supported Languages</h4>
+            <div class="language-list">
+                <div class="language-item">
+                    <span class="lang-badge csharp">C#</span>
+                    <span>Roslyn AST parsing (classes, methods, properties)</span>
+                </div>
+                <div class="language-item">
+                    <span class="lang-badge javascript">JS/TS</span>
+                    <span>Regex-based parsing (functions, classes, exports)</span>
+                </div>
+                <div class="language-item">
+                    <span class="lang-badge plaintext">Other</span>
+                    <span>Plain text chunking with configurable overlap</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Useful Links</h3>
+        </div>
+        <div class="card-body">
+            <div class="links-grid">
+                <a href="/swagger" target="_blank" class="link-card">
+                    <span class="link-icon">📖</span>
+                    <span class="link-text">Swagger API Docs</span>
+                </a>
+                <a href="/health" target="_blank" class="link-card">
+                    <span class="link-icon">💚</span>
+                    <span class="link-text">Health Check</span>
+                </a>
+                <a href="http://localhost:6333/dashboard" target="_blank" class="link-card">
+                    <span class="link-icon">🗄️</span>
+                    <span class="link-text">Qdrant Dashboard</span>
+                </a>
+                <a href="https://github.com/mykolaMykhaliuk/poc-codebase-rag" target="_blank" class="link-card">
+                    <span class="link-icon">🐙</span>
+                    <span class="link-text">GitHub Repository</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .about-content {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .feature-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+    }
+
+    .feature-icon {
+        font-size: 1.5rem;
+    }
+
+    .feature-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .feature-text span {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .steps-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .step-item {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .step-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+
+    .step-content {
+        flex: 1;
+    }
+
+    .step-content p {
+        margin: 0.5rem 0;
+        color: var(--text-secondary);
+    }
+
+    .code-block {
+        display: block;
+        background: var(--code-bg);
+        color: #e2e8f0;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.875rem;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin-top: 0.5rem;
+    }
+
+    .admin-pages {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .admin-page-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+    }
+
+    .page-icon {
+        font-size: 1.5rem;
+    }
+
+    .page-info p {
+        margin: 0.25rem 0 0 0;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .info-box {
+        background: var(--bg-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+
+    .info-box .info-row {
+        display: flex;
+        gap: 1rem;
+        padding: 0.5rem 0;
+    }
+
+    .info-box .info-label {
+        font-weight: 600;
+        min-width: 100px;
+    }
+
+    .info-box .info-value {
+        color: var(--text-secondary);
+    }
+
+    h4 {
+        margin: 1.5rem 0 0.75rem 0;
+        color: var(--text-primary);
+        font-size: 1rem;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0.5rem 0;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .data-table th {
+        background: var(--bg-color);
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .data-table td code {
+        background: var(--code-bg);
+        color: #e2e8f0;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8125rem;
+    }
+
+    .method-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .method-badge.get {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .method-badge.post {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .example-prompts {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .example-prompt {
+        background: var(--bg-color);
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        font-style: italic;
+        color: var(--text-secondary);
+        border-left: 3px solid var(--primary-color);
+    }
+
+    .architecture-diagram {
+        background: var(--code-bg);
+        color: #e2e8f0;
+        padding: 1rem;
+        border-radius: 8px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.75rem;
+        overflow-x: auto;
+        line-height: 1.4;
+    }
+
+    .pipeline-flow {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin: 1rem 0;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+    }
+
+    .pipeline-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.75rem 1rem;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .pipeline-icon {
+        font-size: 1.25rem;
+    }
+
+    .pipeline-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .pipeline-arrow {
+        color: var(--text-secondary);
+        font-size: 1.25rem;
+    }
+
+    .language-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+    }
+
+    .language-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .lang-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        min-width: 50px;
+        text-align: center;
+    }
+
+    .lang-badge.csharp {
+        background: #9b4dca;
+        color: white;
+    }
+
+    .lang-badge.javascript {
+        background: #f7df1e;
+        color: #323330;
+    }
+
+    .lang-badge.plaintext {
+        background: #6b7280;
+        color: white;
+    }
+
+    .language-item span:last-child {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .links-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+    }
+
+    .link-card {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        text-decoration: none;
+        color: var(--text-primary);
+        transition: all 0.2s;
+    }
+
+    .link-card:hover {
+        background: var(--primary-color);
+        color: white;
+    }
+
+    .link-icon {
+        font-size: 1.25rem;
+    }
+
+    .link-text {
+        font-weight: 500;
+    }
+
+    @@media (max-width: 768px) {
+        .pipeline-flow {
+            flex-direction: column;
+        }
+
+        .pipeline-arrow {
+            transform: rotate(90deg);
+        }
+    }
+</style>
