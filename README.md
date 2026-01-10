@@ -288,7 +288,7 @@ This provides interactive API documentation where you can test endpoints directl
 
 ## MCP Server
 
-This service includes a built-in **Model Context Protocol (MCP)** server, enabling direct integration with Claude Desktop, Claude Code, and other MCP-compatible AI assistants.
+This service includes a built-in **Model Context Protocol (MCP)** server, enabling direct integration with Claude Desktop, Claude Code, and other MCP-compatible AI assistants. MCP allows AI assistants to directly query and interact with your indexed codebase.
 
 ### MCP Endpoint
 
@@ -306,18 +306,61 @@ The MCP server runs on the same port as the REST API using HTTP/SSE transport:
 | `GetHealth` | Check system health and index status |
 | `GetIndexStats` | Get detailed statistics about the indexed codebase |
 
+#### QueryCodebase Tool
+
+Searches the indexed codebase and returns an LLM-ready prompt with relevant code context.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `question` | string | Yes | The question or query about the codebase |
+| `maxResults` | int | No | Maximum code chunks to return (default: 10) |
+| `languages` | string[] | No | Filter by language: `csharp`, `javascript`, `plaintext` |
+| `pathFilter` | string | No | Filter by file path prefix (e.g., `src/Services`) |
+
+**Returns:** JSON with `prompt`, `sources` (file paths, symbols, line numbers, scores), and `metadata`.
+
+#### RebuildIndex Tool
+
+Scans all source files, generates embeddings, and rebuilds the vector index.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `force` | bool | No | Force rebuild even if index exists (default: true) |
+
+**Returns:** JSON with `success`, `filesProcessed`, `chunksIndexed`, `errors`, and `durationMs`.
+
+#### GetHealth Tool
+
+Checks the health and connectivity status of the RAG system.
+
+**Returns:** JSON with `status`, `qdrantConnected`, `indexExists`, `chunkCount`, `lastRebuild`, and any errors.
+
+#### GetIndexStats Tool
+
+Provides detailed statistics about the indexed codebase.
+
+**Returns:** JSON with `totalChunks`, `totalFiles`, `filesByLanguage`, `chunksBySymbolType`, and `indexedFiles` list.
+
 ### MCP Resources
+
+Resources provide read-only access to system state and can be read by MCP clients.
 
 | Resource URI | Description |
 |--------------|-------------|
-| `rag://index/status` | Current index status and statistics |
-| `rag://index/files` | List of all indexed files |
-| `rag://config/settings` | Current RAG configuration |
-| `rag://activity/recent` | Recent activity log |
+| `rag://index/status` | Current index status including rebuild time, statistics, and errors |
+| `rag://index/files` | List of all indexed files with language and chunk counts |
+| `rag://config/settings` | Current RAG configuration (embedding model, chunk sizes, exclusions) |
+| `rag://activity/recent` | Recent activity log (queries and index rebuilds) |
 
 ### Claude Desktop Integration
 
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+Add to your Claude Desktop configuration file:
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+**Linux:** `~/.config/Claude/claude_desktop_config.json`
 
 ```json
 {
@@ -330,9 +373,11 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 }
 ```
 
+After saving, restart Claude Desktop. You should see "codebase-rag" listed in your connected MCP servers.
+
 ### Claude Code Integration
 
-For Claude Code, add to your MCP settings:
+For Claude Code CLI, add to your MCP settings (`.claude/settings.json` or project-level config):
 
 ```json
 {
@@ -345,15 +390,51 @@ For Claude Code, add to your MCP settings:
 }
 ```
 
-### Example MCP Tool Usage
+### Example MCP Conversations
 
 Once connected, you can interact with your codebase through natural language:
 
+**Basic Queries:**
 ```
-"Query the codebase for how user authentication works"
-"Rebuild the index to pick up recent changes"
-"Show me the health status of the RAG system"
+"How does user authentication work in this codebase?"
+"Find the code that handles payment processing"
+"What database models are defined in this project?"
 ```
+
+**Filtered Queries:**
+```
+"Show me all service classes in the src/Services folder"
+"How are API endpoints defined? Only look at C# files"
+"Find error handling patterns, limit to 5 results"
+```
+
+**Index Management:**
+```
+"Rebuild the codebase index - I just added new files"
+"Check the health of the RAG system"
+"Show me statistics about what's been indexed"
+```
+
+### MCP Troubleshooting
+
+**Connection refused:**
+- Ensure Docker containers are running: `docker compose ps`
+- Verify the API is healthy: `curl http://localhost:5000/health`
+
+**Tools not appearing:**
+- Restart Claude Desktop/Claude Code after config changes
+- Check JSON syntax in configuration file
+- Verify URL is accessible from your machine
+
+**Empty results:**
+- Ensure index was built: use `GetHealth` tool or check `/health/ready`
+- Run `RebuildIndex` if the codebase has changed
+- Check if files match supported extensions (see Parser Mapping)
+
+**Slow responses:**
+- First query may be slow (embedding API call)
+- Large codebases take longer to search
+- Consider reducing `maxResults` parameter
 
 ---
 
