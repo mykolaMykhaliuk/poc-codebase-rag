@@ -1,18 +1,38 @@
 @using Microsoft.AspNetCore.Components.Routing
+@inject IWebHostEnvironment Env
 
-<Router AppAssembly="typeof(Program).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.AdminLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <PageTitle>Not Found</PageTitle>
+<ErrorBoundary>
+    <ChildContent>
+        <Router AppAssembly="typeof(Program).Assembly">
+            <Found Context="routeData">
+                <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.AdminLayout)" />
+                <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            </Found>
+            <NotFound>
+                <PageTitle>Not Found</PageTitle>
+                <LayoutView Layout="typeof(Layout.AdminLayout)">
+                    <div class="not-found">
+                        <h1>404 - Page Not Found</h1>
+                        <p>The page you're looking for doesn't exist.</p>
+                        <a href="/admin">Return to Dashboard</a>
+                    </div>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </ChildContent>
+    <ErrorContent Context="ex">
         <LayoutView Layout="typeof(Layout.AdminLayout)">
-            <div class="not-found">
-                <h1>404 - Page Not Found</h1>
-                <p>The page you're looking for doesn't exist.</p>
-                <a href="/admin">Return to Dashboard</a>
+            <div class="alert alert-error">
+                <h3>An unhandled error occurred</h3>
+                @if (Env.IsDevelopment())
+                {
+                    <pre style="white-space: pre-wrap; word-break: break-all; margin-top: 0.5rem; font-size: 0.8rem;">@ex.ToString()</pre>
+                }
+                else
+                {
+                    <p>Please try refreshing the page. If the problem persists, check the application logs.</p>
+                }
             </div>
         </LayoutView>
-    </NotFound>
-</Router>
+    </ErrorContent>
+</ErrorBoundary>

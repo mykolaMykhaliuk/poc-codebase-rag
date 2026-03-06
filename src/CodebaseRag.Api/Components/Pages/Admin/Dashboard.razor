@@ -3,6 +3,7 @@
 @inject IVectorStore VectorStore
 @inject Services.IConfigurationManager ConfigManager
 @inject ILogger<Dashboard> Logger
+@inject NavigationManager NavManager
 @rendermode @(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode())
 
 <PageTitle>Dashboard - Codebase RAG</PageTitle>
@@ -151,17 +152,22 @@
 
         try
         {
-            using var httpClient = new HttpClient { BaseAddress = new Uri("http://localhost:8080") };
+            using var httpClient = new HttpClient { BaseAddress = new Uri(NavManager.BaseUri) };
             var response = await httpClient.PostAsync("/rag/rebuild", null);
+
+            var rebuildResult = await response.Content.ReadFromJsonAsync<RebuildResponse>();
 
             if (response.IsSuccessStatusCode)
             {
-                _message = "Index rebuilt successfully!";
+                _message = $"Index rebuilt successfully! {rebuildResult?.FilesProcessed} files, {rebuildResult?.ChunksIndexed} chunks.";
                 _isError = false;
             }
             else
             {
-                _message = $"Rebuild failed: {response.StatusCode}";
+                var errors = rebuildResult?.Errors is { Count: > 0 }
+                    ? string.Join("; ", rebuildResult.Errors)
+                    : response.StatusCode.ToString();
+                _message = $"Rebuild failed: {errors}";
                 _isError = true;
             }
 

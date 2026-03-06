@@ -30,7 +30,8 @@ builder.Services.AddSwaggerGen(options =>
 
 // Add Blazor Server for Admin UI
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    .AddCircuitOptions(options => options.DetailedErrors = builder.Environment.IsDevelopment());
 
 // Register parsers
 builder.Services.AddSingleton<ICodeParser, PlainTextParser>();
@@ -62,6 +63,11 @@ builder.Services
 var app = builder.Build();
 
 // Configure middleware
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
